@@ -1,0 +1,39 @@
+# 批处理文件
+*.bat
+
+# 压缩包文件
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tar.bz2
+*.iso
+
+# 日志文件
+logs/
+*.log
+
+# IDE配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python相关
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+
+# NapCat相关
+napcat/node_modules/
+napcat/cache/
+napcat/logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
