@@ -9,7 +9,7 @@ TinglanBot 是一个基于 NcatBot 的 QQ 机器人项目，使用 NapCat 作为
 - 内置示例插件：发送 `hello` 后回复 `hi`。
 - 内置群头衔插件：支持群成员申请头衔，以及管理员为群成员发放头衔。
 
-## 分发版使用方式
+## 使用方式
 
 分发版使用 `dist` 目录中的程序：
 
@@ -17,13 +17,7 @@ TinglanBot 是一个基于 NcatBot 的 QQ 机器人项目，使用 NapCat 作为
 dist\TinglanBot\TinglanBot.exe
 ```
 
-使用时请进入分发版目录，直接运行：
-
-```powershell
-.\TinglanBot.exe
-```
-
-或者双击 `TinglanBot.exe` 启动。
+使用时双击 `TinglanBot.exe` 启动。
 
 注意：不要只单独复制 `TinglanBot.exe`。它需要和同目录下的 `_internal`、`plugins`、`data` 等目录一起使用。
 
@@ -39,16 +33,6 @@ TinglanBot\
 
 如果首次启动时没有 `config.yaml`，NcatBot 会按默认流程生成配置文件。按提示完成配置后再次启动即可。
 
-## NapCat 连接
-
-本项目默认通过 NapCat 的 WebSocket 服务连接 QQ。默认配置通常使用：
-
-```text
-ws://localhost:3001
-```
-
-也就是说，运行 TinglanBot 前需要先确保 NapCat 已经启动，并且 WebSocket 服务端口与 `config.yaml` 中的配置一致。
-
 ## 插件说明
 
 插件位于：
@@ -63,19 +47,3 @@ plugins\
 - `set_group_special_title`：群头衔插件，用于申请或发放群成员专属头衔。
 
 修改或新增插件后，重新启动程序即可加载最新内容。
-
-## 重新打包
-
-开发者可以使用项目根目录下的脚本重新生成分发版：
-
-```powershell
-.\build（自动打包）.ps1
-```
-
-打包完成后，产物位于：
-
-```text
-dist\TinglanBot\
-```
-
-发布给用户时，请发布整个 `TinglanBot` 文件夹，而不是只发布 exe 文件。
