@@ -28,6 +28,11 @@ __pycache__/
 *.egg
 dist/
 build/
+.venv/
+venv/
+ENV/
+env/
+.env
 
 # NapCat相关
 napcat/node_modules/
@@ -37,3 +42,6 @@ napcat/logs/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+#备份
+config_backup.yaml

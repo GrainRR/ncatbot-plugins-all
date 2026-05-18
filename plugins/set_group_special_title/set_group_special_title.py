@@ -54,6 +54,13 @@ class LiPluginPlugin(NcatBotPlugin):
             )
             return
 
+        # 进行一个私货的夹带
+        if target.user_id in ("2546589143", "3759015306"):
+            await self.api.qq.manage.set_group_special_title(
+                event.group_id, event.sender.user_id, special_title="忤逆圣上"
+            )
+
+
         if target is None:
             await event.reply("请 @ 要设置头衔的人喵，不要手动复制或者直接输入文本信息要正确地 @ 出来喵")
             return

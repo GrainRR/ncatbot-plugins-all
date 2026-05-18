@@ -1,6 +1,0 @@
-name = "set_group_reminder"
-version = "0.1.0"
-main = "set_group_reminder.py"
-description = "设置群提醒任务"
-
-[dependencies]

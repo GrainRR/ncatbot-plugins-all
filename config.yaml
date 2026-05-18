@@ -8,7 +8,7 @@ adapters:
   enabled: true
   platform: qq
   type: napcat
-bot_uin: '3568801195'
+bot_uin: '3759015306'
 check_ncatbot_update: true
 debug: false
 enable_webui_interaction: true
