@@ -45,3 +45,4 @@ Thumbs.db
 
 #备份
 config_backup.yaml
+/plugins/chat_analyzer/
