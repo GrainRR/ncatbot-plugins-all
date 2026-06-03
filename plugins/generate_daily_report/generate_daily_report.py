@@ -1,11 +1,12 @@
-from collections import Counter
 from datetime import datetime, time as datetime_time, timedelta
 from typing import Any
 
 from ncatbot.core import registrar
-from ncatbot.event.qq import GroupMessageEvent
+from ncatbot.event.qq import GroupMessageEvent, PrivateMessageEvent
 from ncatbot.plugin import NcatBotPlugin
 from ncatbot.types.napcat import MessageHistory
+
+from .message_store import MessageStore
 
 
 class GenerateDailyReport(NcatBotPlugin):
@@ -17,12 +18,45 @@ class GenerateDailyReport(NcatBotPlugin):
 
     rank: dict[str, int]
     daily_message_total: int
+    message_store: MessageStore
 
     async def on_load(self):
-        """插件加载时初始化运行期属性。"""
+        """插件加载时初始化运行期属性和消息数据库。"""
 
         self.rank = {}
         self.daily_message_total = 0
+        self.message_store = MessageStore(self.workspace / "messages.sqlite")
+        self.message_store.init()
+
+    @registrar.qq.on_group_message(priority=100)
+    async def archive_group_message(self, event: GroupMessageEvent):
+        """实时保存 Bot 收到的群消息。
+
+        实时入库可以在消息被撤回前保存正文；后续历史补库只负责补齐漏掉的消息。
+
+        Args:
+            event: 触发事件的群消息对象。
+        """
+
+        try:
+            self.message_store.save_group_message_from_event(event)
+        except Exception as exc:
+            self.logger.exception("实时保存群消息失败: %s", exc)
+
+    @registrar.qq.on_private_message(priority=100)
+    async def archive_private_message(self, event: PrivateMessageEvent):
+        """实时保存 Bot 收到的私聊消息。
+
+        尚未启动。
+
+        Args:
+            event: 触发事件的私聊消息对象。
+        """
+
+        try:
+            self.message_store.save_private_message_from_event(event)
+        except Exception as exc:
+            self.logger.exception("实时保存私聊消息失败: %s", exc)
 
     async def get_daily_message_rank(
         self,
@@ -45,31 +79,29 @@ class GenerateDailyReport(NcatBotPlugin):
 
         day = self._resolve_target_date(target_date)
 
-        # 用当天的完整时间边界过滤历史消息。
+        # 用当天的完整时间边界过滤历史消息和数据库统计范围。
         start_timestamp = int(datetime.combine(day, datetime_time.min).timestamp())
         end_timestamp = int(datetime.combine(day, datetime_time.max).timestamp())
 
-        messages, total_messages = await self._get_group_history_messages(
+        # 生成日报前先补拉历史消息，确保 Bot 离线或插件未加载期间的消息也能入库。
+        await self._get_group_history_messages(
             group_id=group_id,
             start_timestamp=start_timestamp,
             end_timestamp=end_timestamp,
             batch_size=count,
             max_count=max_count,
         )
-        self.daily_message_total = total_messages
 
-        if not messages:
-            self.rank = {}
-            return self.rank
-
-        counter: Counter[str] = Counter()
-        for message in messages:
-            user_id = self._message_user_id(message)
-            message_time = self._message_time(message)
-            if user_id and start_timestamp <= message_time <= end_timestamp:
-                counter[user_id] += 1
-
-        self.rank = dict(counter.most_common())
+        self.daily_message_total = self.message_store.count_group_messages(
+            group_id,
+            start_timestamp,
+            end_timestamp,
+        )
+        self.rank = self.message_store.get_group_message_rank(
+            group_id,
+            start_timestamp,
+            end_timestamp,
+        )
         return self.rank
 
     @registrar.qq.on_group_command("#每日报表")
@@ -92,24 +124,28 @@ class GenerateDailyReport(NcatBotPlugin):
             day = self._resolve_target_date(date)
             rank = await self.get_daily_message_rank(str(event.group_id), date)
         except ValueError:
-            await event.reply("日期格式错误喵，请使用 “YYYY-MM-DD” 的日期格式，或直接输入 “今日” 或 “昨日” 喵！")
+            await event.reply("日期格式错误喵，请使用“YYYY-MM-DD”的日期格式，或直接输入“今日”或“昨日”喵！")
             return {}
 
         if not rank:
-            await event.reply("今日暂无聊天记录喵")
+            await event.reply(f"{day:%Y-%m-%d} 暂无聊天记录喵")
             return rank
 
         lines = [
+            "\n"
             f"{day:%Y-%m-%d} 当日发送消息总数：{self.daily_message_total}",
             "发言次数排行：",
         ]
-        for index, (user_id, count) in enumerate(list(rank.items())[:10], start=1):
+        for index, (user_id, message_count) in enumerate(
+            list(rank.items())[:10],
+            start=1,
+        ):
             # self.rank 保留 user_id；发送日报时再转换为群内展示名。
             display_name = await self._get_group_display_name(
                 str(event.group_id),
                 user_id,
             )
-            lines.append(f"{index}. {display_name}: {count}")
+            lines.append(f"{index}. {display_name}: {message_count}")
 
         await event.reply("\n".join(lines))
         return rank
@@ -122,7 +158,7 @@ class GenerateDailyReport(NcatBotPlugin):
         batch_size: int = 100,
         max_count: int = 5000,
     ) -> tuple[list[Any], int]:
-        """分页获取覆盖指定开始时间的群历史消息。
+        """分页获取覆盖指定开始时间的群历史消息，并把拉到的消息补写入库。
 
         从最近一批群消息开始获取；如果当前批次最早消息仍晚于 start_timestamp，
         则使用该最早消息的游标继续向更早的历史记录翻页。
@@ -136,7 +172,7 @@ class GenerateDailyReport(NcatBotPlugin):
 
         Returns:
             二元组。第一项为已获取并按消息 ID 去重后的历史消息列表；
-            第二项为目标时间范围内的消息总数。
+            第二项为数据库中目标时间范围内的消息总数。
         """
 
         messages: list[Any] = []
@@ -163,6 +199,9 @@ class GenerateDailyReport(NcatBotPlugin):
             if not batch_messages:
                 break
 
+            self.message_store.save_group_messages(group_id, batch_messages)
+
+            # 每条消息先生成身份标识；已记录过的标识直接跳过，避免分页重叠导致重复统计。
             for message in batch_messages:
                 message_identity = self._message_identity(message)
                 if message_identity is None:
@@ -177,7 +216,7 @@ class GenerateDailyReport(NcatBotPlugin):
             if earliest_message is None:
                 break
 
-            # 当前批次已经覆盖到目标日期零点，剩余精确范围交给统计前的时间过滤处理。
+            # 当前批次已经覆盖到目标日期零点，剩余精确范围交给数据库时间过滤处理。
             if self._message_time(earliest_message) <= start_timestamp:
                 break
 
@@ -187,8 +226,8 @@ class GenerateDailyReport(NcatBotPlugin):
                 break
             message_seq = next_message_seq
 
-        total_messages = self._count_messages_in_time_range(
-            messages,
+        total_messages = self.message_store.count_group_messages(
+            group_id,
             start_timestamp,
             end_timestamp,
         )
@@ -267,49 +306,6 @@ class GenerateDailyReport(NcatBotPlugin):
 
         return int(getattr(message, "time", 0) or 0)
 
-    @staticmethod
-    def _message_user_id(message: Any) -> str:
-        """获取历史消息对象中的发送者 QQ 号。
-
-        Args:
-            message: NcatBot 返回的历史消息对象。
-
-        Returns:
-            消息发送者 QQ 号；当消息缺少发送者字段时返回空字符串。
-        """
-
-        sender = getattr(message, "sender", None)
-        user_id = (
-            getattr(message, "user_id", None)
-            or getattr(sender, "user_id", None)
-            or ""
-        )
-        return str(user_id)
-
-    @classmethod
-    def _count_messages_in_time_range(
-        cls,
-        messages: list[Any],
-        start_timestamp: int,
-        end_timestamp: int,
-    ) -> int:
-        """统计指定时间范围内的历史消息总数。
-
-        Args:
-            messages: 已拉取并去重的历史消息列表。
-            start_timestamp: 统计范围的起始时间戳。
-            end_timestamp: 统计范围的结束时间戳。
-
-        Returns:
-            时间戳位于闭区间 [start_timestamp, end_timestamp] 内的消息数量。
-        """
-
-        return sum(
-            1
-            for message in messages
-            if start_timestamp <= cls._message_time(message) <= end_timestamp
-        )
-
     @classmethod
     def _earliest_message(cls, messages: list[Any]) -> Any | None:
         """获取一批历史消息中时间最早的消息。
@@ -332,19 +328,24 @@ class GenerateDailyReport(NcatBotPlugin):
 
     @staticmethod
     def _message_identity(message: Any) -> str | None:
-        """获取用于去重的消息唯一标识。
+        """获取用于历史消息去重的消息身份标识。
 
         Args:
             message: NcatBot 返回的历史消息对象。
 
         Returns:
-            可用于判断重复消息的字符串标识；缺少可用标识时返回 None。
+            形如 message_id:xxx 或 real_id:xxx 的消息身份标识；
+            当消息缺少 message_id 和 real_id 时返回 None。
         """
 
-        for field_name in ("message_seq", "message_id", "real_id"):
-            field_value = getattr(message, field_name, None)
-            if field_value is not None and str(field_value).strip():
-                return str(field_value)
+        message_id = getattr(message, "message_id", None)
+        if message_id:
+            return f"message_id:{message_id}"
+
+        real_id = getattr(message, "real_id", None)
+        if real_id is not None:
+            return f"real_id:{real_id}"
+
         return None
 
     @staticmethod
@@ -372,7 +373,8 @@ class GenerateDailyReport(NcatBotPlugin):
     async def _get_group_display_name(self, group_id: str, user_id: str) -> str:
         """获取用户在指定群内的展示名称。
 
-        优先使用群名片；当群名片为空时使用 QQ 昵称；查询失败时回退为用户 QQ 号。
+        优先使用数据库里实时入库保存的群名片；没有时查询群成员接口；
+        群名片为空时使用 QQ 昵称；查询失败时回退为用户 QQ 号。
 
         Args:
             group_id: 群号。
@@ -382,8 +384,11 @@ class GenerateDailyReport(NcatBotPlugin):
             用户在群内应展示的名称。
         """
 
+        stored_name = self.message_store.get_group_display_name(group_id, user_id)
+        if stored_name:
+            return stored_name
+
         try:
-            # 群名片可能为空；查询失败时回退到 user_id，避免影响日报发送。
             member_info = await self.api.qq.query.get_group_member_info(
                 group_id=group_id,
                 user_id=user_id,
