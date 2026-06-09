@@ -52,6 +52,9 @@ class SetGroupForbiddenWord(NcatBotPlugin):
             word: 需要添加的违禁词。为空时提示用户补充内容。
         """
 
+        if not await self._is_group_manager(event):
+            return
+
         if not word:
             await event.reply("请使用类似：#添加违禁词 目标违禁词 的格式来添加违禁词")
             return
@@ -81,6 +84,9 @@ class SetGroupForbiddenWord(NcatBotPlugin):
             word: 需要删除的违禁词。为空时提示用户补充内容。
         """
 
+        if not await self._is_group_manager(event):
+            return
+
         if not word:
             await event.reply("请使用类似：#删除违禁词 目标违禁词 的格式来删除违禁词")
             return
@@ -104,6 +110,9 @@ class SetGroupForbiddenWord(NcatBotPlugin):
             event: 触发命令的消息事件。
         """
 
+        if not await self._is_group_manager(event):
+            return
+
         words = _read_forbidden_words()
 
         if not words:
@@ -112,6 +121,22 @@ class SetGroupForbiddenWord(NcatBotPlugin):
 
         message = "当前违禁词列表：\n" + "\n".join(words)
         await event.reply(message)
+
+    async def _is_group_manager(self, event: GroupMessageEvent) -> bool:
+        """判断命令发送者是否为当前群的群主或管理员。
+
+        Args:
+            event: 触发命令的群消息事件。
+
+        Returns:
+            命令发送者是群主或管理员时返回 True，否则返回 False。
+        """
+
+        member_info = await self.api.qq.query.get_group_member_info(
+            group_id=event.group_id,
+            user_id=event.sender.user_id,
+        )
+        return getattr(member_info, "role", None) in ("owner", "admin")
 
 
 def _write_forbidden_words(words: list[str]):
