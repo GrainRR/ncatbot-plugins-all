@@ -1,0 +1,8 @@
+name = "group_forbidden_words"
+version = "0.1.0"
+main = "group_forbidden_words.py"
+author = "Li"
+description = "群违禁词管理"
+pip_dependencies = []
+
+[dependencies]

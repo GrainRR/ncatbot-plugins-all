@@ -1,0 +1,6 @@
+name = "group_special_title"
+version = "0.1.0"
+main = "group_special_title.py"
+description = "设置群成员专属头衔"
+
+[dependencies]
