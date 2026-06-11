@@ -1,49 +1,72 @@
-# TinglanBot
+# TinglanBot 插件说明
 
-TinglanBot 是一个基于 NcatBot 的 QQ 机器人项目，使用 NapCat 作为 QQ 连接端，通过插件目录加载机器人功能。
+本文仅说明当前仓库内各插件的基本功能和安装方式。
 
-## 功能简介
+## 插件功能
 
-- 连接 NapCat，接收并处理 QQ 群聊和私聊消息。
-- 支持从 `plugins` 目录加载自定义插件。
-- 内置示例插件：发送 `hello` 后回复 `hi`。
-- 内置群头衔插件：支持群成员申请头衔，以及管理员为群成员发放头衔。
+### group_special_title
 
-## 使用方式
+群成员专属头衔插件。
 
-分发版使用 `dist` 目录中的程序：
+- 群成员可以申请自己的专属头衔。
+- 群主或管理员可以为群成员发放专属头衔。
+- 头衔长度限制为最多 6 个汉字或 12 个半角字符。
 
-```text
-dist\TinglanBot\TinglanBot.exe
+### group_daily_report
+
+群聊每日报表插件。
+
+- 自动保存群聊消息记录。
+- 支持生成今日、昨日或指定日期的群发言排行。
+- 报表包含当日消息总数和发言前 10 名。
+
+### group_forbidden_words
+
+群违禁词管理插件。
+
+- 检测群消息中的违禁词。
+- 命中违禁词后提示并撤回消息。
+- 支持添加、删除和查看违禁词。
+
+### bilibili_url_parser
+
+B 站视频链接解析插件。
+
+- 自动识别群聊或私聊中的 B 站视频链接。
+- 支持 BV 号、AV 号、完整链接、短链接和 QQ 分享小程序。
+- 回复视频标题、UP 主、播放数据、简介和封面等信息。
+
+## 安装方式
+
+将 `/path/to/your/ncatbot` 替换为你的 NcatBot 项目目录。
+
+### 安装 group_special_title
+
+```bash
+cd /path/to/your/ncatbot/plugins
+git clone https://github.com/GrainRR/ncatbot-plugin-set-group-special-title.git group_special_title
 ```
 
-使用时双击 `TinglanBot.exe` 启动。
+### 安装 group_daily_report
 
-注意：不要只单独复制 `TinglanBot.exe`。它需要和同目录下的 `_internal`、`plugins`、`data` 等目录一起使用。
-
-分发版目录结构大致如下：
-
-```text
-TinglanBot\
-  TinglanBot.exe
-  _internal\
-  plugins\
-  data\
+```bash
+cd /path/to/your/ncatbot/plugins
+git clone https://github.com/GrainRR/ncatbot-plugin-generate-daily-report.git group_daily_report
 ```
 
-如果首次启动时没有 `config.yaml`，NcatBot 会按默认流程生成配置文件。按提示完成配置后再次启动即可。
+### 安装 group_forbidden_words
 
-## 插件说明
-
-插件位于：
-
-```text
-plugins\
+```bash
+cd /path/to/your/ncatbot/plugins
+git clone https://github.com/GrainRR/ncatbot-plugin-set-group-forbidden-word.git group_forbidden_words
 ```
 
-当前包含：
+### 安装 bilibili_url_parser
 
-- `Li_plugin`：示例插件，收到 `hello` 指令后回复 `hi`。
-- `set_group_special_title`：群头衔插件，用于申请或发放群成员专属头衔。
+```bash
+cd /path/to/your/ncatbot/plugins
+git clone https://github.com/GrainRR/ncatbot-plugin-bilibili-url-parser.git bilibili_url_parser
+pip install bilibili-api-python aiohttp
+```
 
-修改或新增插件后，重新启动程序即可加载最新内容。
+安装完成后，重启机器人即可加载插件。

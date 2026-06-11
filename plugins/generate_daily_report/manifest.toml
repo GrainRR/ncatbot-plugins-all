@@ -1,4 +1,0 @@
-name = "generate_daily_report"
-version = "0.1.0"
-main = "generate_daily_report.py"
-description = "生成每日聊天数据报表"
