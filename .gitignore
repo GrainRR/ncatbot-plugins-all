@@ -34,6 +34,9 @@ ENV/
 env/
 .env
 
+# 本地独立插件仓库
+plugins/bilibili_url_parser/
+
 # NapCat相关
 napcat/node_modules/
 napcat/cache/
