@@ -1,4 +1,4 @@
-"""每日群聊报表插件的消息 SQLite 存储。"""
+"""消息归档插件的 SQLite 存储。"""
 
 from __future__ import annotations
 
@@ -8,6 +8,23 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+
+MESSAGE_ARCHIVE_DIR_NAME = "message_archive"
+MESSAGE_DB_FILENAME = "messages.sqlite"
+
+
+def get_message_archive_db_path(plugin_workspace: Path) -> Path:
+    """根据任意插件 workspace 获取共享消息数据库路径。
+
+    Args:
+        plugin_workspace: 当前插件的 workspace 路径，通常为 data/<插件名>。
+
+    Returns:
+        共享消息归档数据库路径 data/message_archive/messages.sqlite。
+    """
+
+    return Path(plugin_workspace).parent / MESSAGE_ARCHIVE_DIR_NAME / MESSAGE_DB_FILENAME
 
 
 class MessageStore:
@@ -23,7 +40,7 @@ class MessageStore:
         self.db_path = Path(db_path)
 
     def init(self) -> None:
-        """初始化数据库目录、数据表和统计索引。"""
+        """初始化数据库目录、数据库文件、数据表和统计索引。"""
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:

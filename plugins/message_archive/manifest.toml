@@ -1,0 +1,6 @@
+name = "message_archive"
+version = "0.1.0"
+main = "message_archive.py"
+description = "消息归档数据库"
+
+[dependencies]

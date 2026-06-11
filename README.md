@@ -4,6 +4,14 @@
 
 ## 插件功能
 
+### message_archive
+
+消息归档数据库插件。
+
+- 保存 Bot 实时收到的群聊和私聊消息。
+- 自动创建 `data/message_archive/messages.sqlite` 数据库。
+- 为其他插件提供统一的消息统计和查询数据源。
+
 ### group_special_title
 
 群成员专属头衔插件。
@@ -16,7 +24,7 @@
 
 群聊每日报表插件。
 
-- 自动保存群聊消息记录。
+- 基于 `message_archive` 的消息数据库生成群聊每日报表。
 - 支持生成今日、昨日或指定日期的群发言排行。
 - 报表包含当日消息总数和发言前 10 名。
 
@@ -40,6 +48,13 @@ B 站视频链接解析插件。
 
 将 `/path/to/your/ncatbot` 替换为你的 NcatBot 项目目录。
 
+### 安装 message_archive
+
+```bash
+cd /path/to/your/ncatbot/plugins
+git clone https://github.com/GrainRR/ncatbot-plugin-message-archive.git message_archive
+```
+
 ### 安装 group_special_title
 
 ```bash
@@ -53,6 +68,8 @@ git clone https://github.com/GrainRR/ncatbot-plugin-set-group-special-title.git 
 cd /path/to/your/ncatbot/plugins
 git clone https://github.com/GrainRR/ncatbot-plugin-generate-daily-report.git group_daily_report
 ```
+
+`group_daily_report` 依赖 `message_archive`，请先安装 `message_archive`。
 
 ### 安装 group_forbidden_words
 

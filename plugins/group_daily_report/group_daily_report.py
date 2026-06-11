@@ -2,11 +2,14 @@ from datetime import datetime, time as datetime_time, timedelta
 from typing import Any
 
 from ncatbot.core import registrar
-from ncatbot.event.qq import GroupMessageEvent, PrivateMessageEvent
+from ncatbot.event.qq import GroupMessageEvent
 from ncatbot.plugin import NcatBotPlugin
 from ncatbot.types.napcat import MessageHistory
 
-from .message_store import MessageStore
+from plugins.message_archive.message_store import (
+    MessageStore,
+    get_message_archive_db_path,
+)
 
 
 class GroupDailyReport(NcatBotPlugin):
@@ -21,42 +24,12 @@ class GroupDailyReport(NcatBotPlugin):
     message_store: MessageStore
 
     async def on_load(self):
-        """插件加载时初始化运行期属性和消息数据库。"""
+        """插件加载时连接共享消息归档数据库。"""
 
         self.rank = {}
         self.daily_message_total = 0
-        self.message_store = MessageStore(self.workspace / "messages.sqlite")
+        self.message_store = MessageStore(get_message_archive_db_path(self.workspace))
         self.message_store.init()
-
-    @registrar.qq.on_group_message(priority=100)
-    async def archive_group_message(self, event: GroupMessageEvent):
-        """实时保存 Bot 收到的群消息。
-
-        实时入库可以在消息被撤回前保存正文；后续历史补库只负责补齐漏掉的消息。
-
-        Args:
-            event: 触发事件的群消息对象。
-        """
-
-        try:
-            self.message_store.save_group_message_from_event(event)
-        except Exception as exc:
-            self.logger.exception("实时保存群消息失败: %s", exc)
-
-    @registrar.qq.on_private_message(priority=100)
-    async def archive_private_message(self, event: PrivateMessageEvent):
-        """实时保存 Bot 收到的私聊消息。
-
-        尚未启动。
-
-        Args:
-            event: 触发事件的私聊消息对象。
-        """
-
-        try:
-            self.message_store.save_private_message_from_event(event)
-        except Exception as exc:
-            self.logger.exception("实时保存私聊消息失败: %s", exc)
 
     async def get_daily_message_rank(
         self,
