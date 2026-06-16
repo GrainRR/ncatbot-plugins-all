@@ -29,10 +29,9 @@ class GroupSpecialTitle(NcatBotPlugin):
     author = "Li"
     description = "设置群成员专属头衔"
 
-
     @registrar.qq.on_group_command("#申请头衔")
     async def apply_special_title(self, event: GroupMessageEvent, title: str = ""):
-        """处理群成员申请专属头衔的命令。
+        """处理群主设置自己专属头衔的命令。
 
         Args:
             event: 触发命令的群消息事件。
@@ -45,6 +44,10 @@ class GroupSpecialTitle(NcatBotPlugin):
 
         if _get_halfwidth_units(title) > 12:
             await event.reply("头衔过长了喵，最多只能设置 6 个汉字或 12 个英文/数字/半角字符喵")
+            return
+
+        if not await self._can_set_special_title(event):
+            await event.reply("只有群主可以设置专属头衔喵")
             return
 
         try:
@@ -64,7 +67,7 @@ class GroupSpecialTitle(NcatBotPlugin):
             target: At = None,
             title: str = ""
     ):
-        """处理管理员为群成员发放专属头衔的命令。
+        """处理群主为群成员发放专属头衔的命令。
 
         Args:
             event: 触发命令的群消息事件。
@@ -79,17 +82,8 @@ class GroupSpecialTitle(NcatBotPlugin):
             await event.reply("请填写头衔喵")
             return
 
-        # 验证是否为群主或者管理
-        member_info = await self.api.qq.query.get_group_member_info(
-            group_id=event.group_id,
-            user_id=event.sender.user_id,
-        )
-        if getattr(member_info, "role", None) not in ("owner", "admin"):
-            await event.reply("铸币喵")
-            await self.api.qq.manage.set_group_special_title(
-                event.group_id, event.sender.user_id, special_title="你是？"
-            )
-            self.logger.info(f"{event.sender.user_id}的群身份是{member_info.role}不符合条件")
+        if not await self._can_set_special_title(event):
+            await event.reply("只有群主可以设置专属头衔喵")
             return
 
         # 进行一个私货的夹带
@@ -107,4 +101,24 @@ class GroupSpecialTitle(NcatBotPlugin):
         except Exception:
             await event.reply(f"❌ 为 {target.user_id} 设置头衔「{title}」失败了喵")
 
+    async def _can_set_special_title(self, event: GroupMessageEvent) -> bool:
+        """判断当前命令发送者是否为群主。
 
+        Args:
+            event: 触发命令的群消息事件，用于获取当前群号和命令发送者 QQ 号。
+
+        Returns:
+            命令发送者是当前群群主时返回 True；命令发送者不是群主，
+            或查询群成员信息失败时返回 False。
+        """
+
+        try:
+            member_info = await self.api.qq.query.get_group_member_info(
+                group_id=event.group_id,
+                user_id=event.sender.user_id,
+            )
+        except Exception as exc:
+            self.logger.exception("查询群成员权限失败: %s", exc)
+            return False
+
+        return getattr(member_info, "role", None) == "owner"

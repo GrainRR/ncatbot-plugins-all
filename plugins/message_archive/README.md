@@ -8,7 +8,7 @@
 
 ```bash
 cd /path/to/your/ncatbot/plugins
-git clone https://github.com/GrainRR/ncatbot-plugin-message-archive.git message_archive
+git clone https://github.com/GrainRR/ncatbot-plugin-message_archive.git message_archive
 ```
 
 安装完成后，重启机器人即可加载插件。
