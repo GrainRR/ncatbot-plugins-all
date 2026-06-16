@@ -1,7 +1,61 @@
-# 批处理文件
+# 操作系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE 和编辑器状态
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python 缓存和虚拟环境
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# Python 构建和打包产物
+build/
+dist/
+*.egg-info/
+*.egg
+
+# 本地环境变量和私有配置
+.env
+.env.*
+!.env.example
+*.local
+*.local.*
+config_backup.yaml
+
+# 运行日志
+logs/
+*.log
+
+# 运行时数据和本地数据库
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+
+# NapCat 本体、运行文件和生成资源
+/napcat/
+
+# 本地 Windows 启动脚本
 *.bat
 
-# 压缩包文件
+# 压缩包和镜像文件
 *.zip
 *.rar
 *.7z
@@ -9,42 +63,3 @@
 *.tar.gz
 *.tar.bz2
 *.iso
-
-# 日志文件
-logs/
-*.log
-
-# IDE配置
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Python相关
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-*.egg
-dist/
-build/
-.venv/
-venv/
-ENV/
-env/
-.env
-
-# 插件
-
-
-# NapCat相关
-napcat/node_modules/
-napcat/cache/
-napcat/logs/
-
-# 系统文件
-.DS_Store
-Thumbs.db
-
-#备份
-config_backup.yaml
