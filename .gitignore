@@ -63,3 +63,6 @@ data/
 *.tar.gz
 *.tar.bz2
 *.iso
+
+#非项目内容
+项目展示说明.md

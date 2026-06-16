@@ -52,21 +52,21 @@ B 站视频链接解析插件。
 
 ```bash
 cd /path/to/your/ncatbot/plugins
-git clone https://github.com/GrainRR/ncatbot-plugin-message-archive.git message_archive
+git clone https://github.com/GrainRR/ncatbot-plugin-message_archive.git message_archive
 ```
 
 ### 安装 group_special_title
 
 ```bash
 cd /path/to/your/ncatbot/plugins
-git clone https://github.com/GrainRR/ncatbot-plugin-set-group-special-title.git group_special_title
+git clone https://github.com/GrainRR/ncatbot-plugin-group-special-title.git group_special_title
 ```
 
 ### 安装 group_daily_report
 
 ```bash
 cd /path/to/your/ncatbot/plugins
-git clone https://github.com/GrainRR/ncatbot-plugin-generate-daily-report.git group_daily_report
+git clone https://github.com/GrainRR/ncatbot-plugin-group-daily-report.git group_daily_report
 ```
 
 `group_daily_report` 依赖 `message_archive`，请先安装 `message_archive`。
@@ -75,7 +75,7 @@ git clone https://github.com/GrainRR/ncatbot-plugin-generate-daily-report.git gr
 
 ```bash
 cd /path/to/your/ncatbot/plugins
-git clone https://github.com/GrainRR/ncatbot-plugin-set-group-forbidden-word.git group_forbidden_words
+git clone https://github.com/GrainRR/ncatbot-plugin-group-forbidden-words.git group_forbidden_words
 ```
 
 ### 安装 bilibili_url_parser
