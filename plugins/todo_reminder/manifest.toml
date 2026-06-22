@@ -1,0 +1,7 @@
+name = "todo_reminder"
+version = "0.1.0"
+main = "todo_reminder.py"
+author = "Li"
+description = "LLM 待办提醒插件"
+
+[dependencies]

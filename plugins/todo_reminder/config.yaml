@@ -1,0 +1,11 @@
+llm_api_base: "https://api.deepseek.com"
+llm_api_url: ""
+llm_api_key: "sk-a3c7114066144c948458e88e4552b743 "
+llm_api_key_env: "TODO_REMINDER_LLM_API_KEY"
+llm_model: "deepseek-v4-flash"
+llm_timeout_seconds: 30
+timezone: "Asia/Shanghai"
+reminder_check_interval: "60s"
+max_pending_todos_per_scope: 100
+max_due_reminders_per_check: 20
+reject_past_reminder: true
