@@ -304,7 +304,7 @@ class TodoReminderPlugin(NcatBotPlugin):
         try:
             # LLM 只负责把自然语言转成结构化草稿，真正写库仍由插件端校验后完成。
             reminder_mode = self.store.get_mode(scope, group_id, user_id)
-            parsed = await self.parser.parse(content, reminder_mode)
+            parsed_items = await self.parser.parse(content, reminder_mode)
         except TodoParseError as exc:
             self.logger.info(
                 "待办设置失败: scope=%s group_id=%s user_id=%s reason=parse_error detail=%s raw=%s",
@@ -328,21 +328,42 @@ class TodoReminderPlugin(NcatBotPlugin):
             await event.reply("解析待办失败，待办没有写入")
             return
 
-        draft = TodoReminderDraft(
-            title=parsed.title,
-            content=None,
-            raw_text=content,
-            remind_at=int(parsed.remind_at.timestamp()) if parsed.remind_at else None,
-            due_at=int(parsed.due_at.timestamp()) if parsed.due_at else None,
-            reminder_text=parsed.reminder_text,
-            llm_json=parsed.raw_json,
-        )
+        pending_count = self.store.count_pending(scope, group_id, user_id)
+        if pending_count + len(parsed_items) > max_pending:
+            self.logger.info(
+                "待办设置失败: scope=%s group_id=%s user_id=%s reason=max_pending_after_parse limit=%s current=%s parsed=%s raw=%s",
+                scope,
+                group_id,
+                user_id,
+                max_pending,
+                pending_count,
+                len(parsed_items),
+                _truncate(content, 100),
+            )
+            await event.reply(
+                f"这次会创建 {len(parsed_items)} 条待办，未完成待办将超过上限 {max_pending} 条，"
+                "请先完成或删除一些待办"
+            )
+            return
+
+        drafts = [
+            TodoReminderDraft(
+                title=parsed.title,
+                content=None,
+                raw_text=content,
+                remind_at=int(parsed.remind_at.timestamp()) if parsed.remind_at else None,
+                due_at=int(parsed.due_at.timestamp()) if parsed.due_at else None,
+                reminder_text=parsed.reminder_text,
+                llm_json=parsed.raw_json,
+            )
+            for parsed in parsed_items
+        ]
         try:
-            todo = self.store.create(
+            todos = self.store.create_many(
                 scope=scope,
                 group_id=group_id,
                 user_id=user_id,
-                draft=draft,
+                drafts=drafts,
                 now=self._now(),
             )
         except Exception as exc:
@@ -357,22 +378,18 @@ class TodoReminderPlugin(NcatBotPlugin):
             await event.reply("保存待办失败，待办没有写入")
             return
 
-        self.logger.info(
-            "待办设置成功: scope=%s group_id=%s user_id=%s id=%s todo_no=%s remind_at=%s title=%s",
-            scope,
-            group_id,
-            user_id,
-            todo.id,
-            todo.todo_no,
-            todo.remind_at,
-            _truncate(todo.title, 100),
-        )
-        result_title = "已设置待办提醒" if todo.remind_at else "已添加待办"
-        await event.reply(
-            f"{result_title}：\n"
-            f"{self._format_inline(todo)}\n"
-            f"提醒时间：{self._format_time(todo.remind_at)}"
-        )
+        for todo in todos:
+            self.logger.info(
+                "待办设置成功: scope=%s group_id=%s user_id=%s id=%s todo_no=%s remind_at=%s title=%s",
+                scope,
+                group_id,
+                user_id,
+                todo.id,
+                todo.todo_no,
+                todo.remind_at,
+                _truncate(todo.title, 100),
+            )
+        await event.reply(self._format_created_todos(todos))
 
     async def _complete_todo(
         self,
@@ -520,6 +537,33 @@ class TodoReminderPlugin(NcatBotPlugin):
                 row += f"\n   内容：{_truncate(item.content, 80)}"
             rows.append(row)
         return "\n".join(rows)
+
+    def _format_created_todos(self, items: list[TodoReminder]) -> str:
+        """格式化创建待办成功后的回复文本。
+
+        Args:
+            items: 本次创建成功的待办列表。
+
+        Returns:
+            可直接发送给用户的创建结果文本。
+        """
+
+        if len(items) == 1:
+            item = items[0]
+            result_title = "已设置待办提醒" if item.remind_at else "已添加待办"
+            return (
+                f"{result_title}：\n"
+                f"{self._format_inline(item)}\n"
+                f"提醒时间：{self._format_time(item.remind_at)}"
+            )
+
+        rows = [f"已添加 {len(items)} 条待办："]
+        for item in items:
+            rows.append(
+                f"{self._format_inline(item)}\n"
+                f"   提醒时间：{self._format_time(item.remind_at)}"
+            )
+        return "\n\n".join(rows)
 
     def _format_inline(self, item: TodoReminder) -> str:
         """格式化待办的单行标题。

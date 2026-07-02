@@ -150,52 +150,87 @@ class TodoStore:
             创建后的完整待办记录。
         """
 
+        return self.create_many(scope, group_id, user_id, [draft], now)[0]
+
+    def create_many(
+        self,
+        scope: str,
+        group_id: str | None,
+        user_id: str,
+        drafts: list[TodoReminderDraft],
+        now: int,
+    ) -> list[TodoReminder]:
+        """在同一个事务中创建多条待办提醒记录。
+
+        Args:
+            scope: 待办来源范围，取值为 `group` 或 `private`。
+            group_id: 群号；私聊待办传入 None。
+            user_id: 创建人 QQ 号。
+            drafts: 已通过 LLM 解析和校验的待办草稿列表。
+            now: 创建时间的 Unix 秒级时间戳。
+
+        Returns:
+            按创建顺序返回的完整待办记录列表。
+
+        Raises:
+            ValueError: drafts 为空时抛出。
+        """
+
+        if not drafts:
+            raise ValueError("drafts cannot be empty")
+
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            todo_no = self._next_todo_no(conn, scope, group_id, user_id)
-            cursor = conn.execute(
-                """
-                INSERT INTO todo_reminders (
-                    todo_no,
-                    scope,
-                    group_id,
-                    user_id,
-                    title,
-                    content,
-                    raw_text,
-                    remind_at,
-                    due_at,
-                    reminder_text,
-                    status,
-                    created_at,
-                    reminded_at,
-                    llm_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
-                """,
-                (
-                    todo_no,
-                    scope,
-                    group_id,
-                    user_id,
-                    draft.title,
-                    draft.content,
-                    draft.raw_text,
-                    _optional_int(draft.remind_at),
-                    _optional_int(draft.due_at),
-                    draft.reminder_text,
-                    STATUS_OPEN,
-                    int(now),
-                    json.dumps(draft.llm_json, ensure_ascii=False),
-                ),
-            )
-            todo_id = int(cursor.lastrowid)
+            used_todo_numbers = self._used_open_todo_numbers(conn, scope, group_id, user_id)
+            todo_ids: list[int] = []
+            for draft in drafts:
+                todo_no = _first_available_todo_no(used_todo_numbers)
+                cursor = conn.execute(
+                    """
+                    INSERT INTO todo_reminders (
+                        todo_no,
+                        scope,
+                        group_id,
+                        user_id,
+                        title,
+                        content,
+                        raw_text,
+                        remind_at,
+                        due_at,
+                        reminder_text,
+                        status,
+                        created_at,
+                        reminded_at,
+                        llm_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                    """,
+                    (
+                        todo_no,
+                        scope,
+                        group_id,
+                        user_id,
+                        draft.title,
+                        draft.content,
+                        draft.raw_text,
+                        _optional_int(draft.remind_at),
+                        _optional_int(draft.due_at),
+                        draft.reminder_text,
+                        STATUS_OPEN,
+                        int(now),
+                        json.dumps(draft.llm_json, ensure_ascii=False),
+                    ),
+                )
+                todo_ids.append(int(cursor.lastrowid))
+                used_todo_numbers.add(todo_no)
+
+            placeholders = ",".join("?" for _ in todo_ids)
             row = conn.execute(
-                "SELECT * FROM todo_reminders WHERE id = ?",
-                (todo_id,),
-            ).fetchone()
-        if row is None:
+                f"SELECT * FROM todo_reminders WHERE id IN ({placeholders}) ORDER BY id ASC",
+                todo_ids,
+            ).fetchall()
+        if len(row) != len(todo_ids):
             raise RuntimeError("todo disappeared after insert")
-        return _row_to_todo(row)
+        return [_row_to_todo(item) for item in row]
 
     def list_pending(
         self,
@@ -504,7 +539,7 @@ class TodoStore:
         )
 
     def _ensure_indexes(self, conn: sqlite3.Connection) -> None:
-        """创建查询索引和范围编号唯一索引。
+        """创建查询索引和当前未完成待办的范围编号唯一索引。
 
         Args:
             conn: 当前 SQLite 连接。
@@ -512,8 +547,11 @@ class TodoStore:
 
         conn.executescript(
             """
+            DROP INDEX IF EXISTS idx_todo_scope_user_no;
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_scope_user_no
-            ON todo_reminders(scope, IFNULL(group_id, ''), user_id, todo_no);
+            ON todo_reminders(scope, IFNULL(group_id, ''), user_id, todo_no)
+            WHERE status = 'open';
 
             CREATE INDEX IF NOT EXISTS idx_todo_scope_status_remind
             ON todo_reminders(scope, group_id, user_id, status, remind_at, id);
@@ -523,14 +561,14 @@ class TodoStore:
             """
         )
 
-    def _next_todo_no(
+    def _used_open_todo_numbers(
         self,
         conn: sqlite3.Connection,
         scope: str,
         group_id: str | None,
         user_id: str,
-    ) -> int:
-        """查询同一范围内已有最大待办序号，并生成下一个序号。
+    ) -> set[int]:
+        """查询同一范围内当前未完成待办已经占用的显示序号。
 
         Args:
             conn: 当前 SQLite 连接。
@@ -539,20 +577,21 @@ class TodoStore:
             user_id: 创建人 QQ 号。
 
         Returns:
-            同一范围内递增的下一个待办序号。
+            状态为 `open` 的待办序号集合；软删除和完成的待办不会占用序号。
         """
 
-        row = conn.execute(
+        rows = conn.execute(
             """
-            SELECT COALESCE(MAX(todo_no), 0) + 1
+            SELECT todo_no
             FROM todo_reminders
             WHERE scope = ?
               AND COALESCE(group_id, '') = COALESCE(?, '')
               AND user_id = ?
+              AND status = ?
             """,
-            (scope, group_id, user_id),
-        ).fetchone()
-        return int(row[0] if row else 1)
+            (scope, group_id, user_id, STATUS_OPEN),
+        ).fetchall()
+        return {int(row["todo_no"]) for row in rows}
 
     def _backfill_todo_no(self, conn: sqlite3.Connection) -> None:
         """给旧数据库中缺失 todo_no 的记录补齐范围内序号。
@@ -667,6 +706,22 @@ def _optional_int(value: Any) -> int | None:
     """把可空数据库字段转换为可空整数。"""
 
     return None if value is None else int(value)
+
+
+def _first_available_todo_no(used_numbers: set[int]) -> int:
+    """从当前未完成待办占用的序号中找出最小可用序号。
+
+    Args:
+        used_numbers: 当前范围内状态为 `open` 的待办序号集合。
+
+    Returns:
+        最小的正整数序号；例如已占用 `{1, 3}` 时返回 `2`。
+    """
+
+    todo_no = 1
+    while todo_no in used_numbers:
+        todo_no += 1
+    return todo_no
 
 
 def _group_key(group_id: str | None) -> str:

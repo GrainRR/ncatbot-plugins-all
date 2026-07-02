@@ -6,7 +6,7 @@ from ncatbot.event.qq import GroupMessageEvent
 from ncatbot.plugin import NcatBotPlugin
 from ncatbot.types.napcat import MessageHistory
 
-from plugins.message_archive.message_store import (
+from message_archive.message_store import (
     MessageStore,
     get_message_archive_db_path,
 )
